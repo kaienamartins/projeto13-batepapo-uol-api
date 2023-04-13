@@ -51,3 +51,12 @@ app.post("/participants", async (req, res) => {
     res.status(500).send("Erro interno do servidor");
   }
 });
+
+app.get("/participants", async (req, res) => {
+  try {
+    const participants = await db.collection("participants").find().toArray();
+    res.send(participants);
+  } catch (err) {
+    res.status(500).send({});
+  }
+});
