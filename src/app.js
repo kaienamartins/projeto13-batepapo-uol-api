@@ -97,9 +97,10 @@ app.post("/messages", async (req, res) => {
     await db
       .collection("messages")
       .insertOne({ from, to, text, type, time: dayjs().format("HH:mm:ss") });
-    res.status(201).send();
+
+    return res.status(201).send();
   } catch (err) {
-    res.status(500).send(err.message);
+    return res.status(500).send(err.message);
   }
 });
 
