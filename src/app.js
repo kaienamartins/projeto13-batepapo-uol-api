@@ -163,10 +163,21 @@ async function checkInactiveParticipants() {
     time: dayjs().format("HH:mm:ss"),
   }));
   await db.collection("messages").insertMany(messages);
+  for (const participant of participantsToRemove) {
+    const message = {
+      from: participant.name,
+      to: "Todos",
+      text: "sai da sala...",
+      type: "status",
+      time: dayjs().format("HH:mm:ss"),
+    };
+    await db.collection("messages").insertOne(message);
+  }
   await db
     .collection("participants")
     .deleteMany({ _id: { $in: participantsToRemove.map((p) => p._id) } });
 }
+
 
 setInterval(async () => {
   await checkInactiveParticipants();
