@@ -66,6 +66,25 @@ app.get("/participants", async (req, res) => {
   } catch (err) {
     res.status(500).send(err.message);
   }
+
+  setInterval(async () => {
+    const participants = await db.collection("participants").find().toArray();
+    const tenSecondsAgo = Date.now() - 10000;
+    const participantsToRemove = participants.filter(
+      (participant) => participant.lastStatus < tenSecondsAgo
+    );
+    const messages = participantsToRemove.map((participant) => ({
+      from: participant.name,
+      to: "Todos",
+      text: "sai da sala...",
+      type: "status",
+      time: dayjs().format("HH:mm:ss"),
+    }));
+    await db.collection("messages").insertMany(messages);
+    await db
+      .collection("participants")
+      .deleteMany({ _id: { $in: participantsToRemove.map((p) => p._id) } });
+  }, 15000); 
 });
 
 app.post("/messages", async (req, res) => {
