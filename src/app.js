@@ -104,5 +104,21 @@ app.post("/messages", async (req, res) => {
   }
 });
 
+app.get("/messages", async (req, res) => {
+  const user = req.headers.user;
+  const limit = req.query.limit;
+
+  try {
+    const messages = await db
+      .collection("messages")
+      .find({ $or: [{ to: "Todos" }, { to: user }, { from: user }] })
+      .sort({ _id: -1 })
+      .limit(Number(limit))
+      .toArray();
+    res.send(messages);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
 
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
