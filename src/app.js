@@ -66,25 +66,6 @@ app.get("/participants", async (req, res) => {
   } catch (err) {
     res.status(500).send(err.message);
   }
-
-  setInterval(async () => {
-    const participants = await db.collection("participants").find().toArray();
-    const tenSecondsAgo = Date.now() - 10000;
-    const participantsToRemove = participants.filter(
-      (participant) => participant.lastStatus < tenSecondsAgo
-    );
-    const messages = participantsToRemove.map((participant) => ({
-      from: participant.name,
-      to: "Todos",
-      text: "sai da sala...",
-      type: "status",
-      time: dayjs().format("HH:mm:ss"),
-    }));
-    await db.collection("messages").insertMany(messages);
-    await db
-      .collection("participants")
-      .deleteMany({ _id: { $in: participantsToRemove.map((p) => p._id) } });
-  }, 15000); 
 });
 
 app.post("/messages", async (req, res) => {
@@ -143,5 +124,46 @@ app.get("/messages", async (req, res) => {
     res.status(500).send(err.message);
   }
 });
+
+app.post("/status", async (req, res) => {
+  const user = req.headers.user;
+  const lastStatus = Date.now();
+
+  try {
+    const participant = await db
+      .collection("participants")
+      .findOne({ name: user });
+
+    if (!user) return res.status(404).send();
+    if (!participant) return res.status(404).send();
+
+    await db
+      .collection("participants")
+      .updateOne({ name: user }, { $set: { lastStatus } });
+
+    res.status(200).send();
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+setInterval(async () => {
+  const participants = await db.collection("participants").find().toArray();
+  const tenSecondsAgo = Date.now() - 10000;
+  const participantsToRemove = participants.filter(
+    (participant) => participant.lastStatus < tenSecondsAgo
+  );
+  const messages = participantsToRemove.map((participant) => ({
+    from: participant.name,
+    to: "Todos",
+    text: "sai da sala...",
+    type: "status",
+    time: dayjs().format("HH:mm:ss"),
+  }));
+  await db.collection("messages").insertMany(messages);
+  await db
+    .collection("participants")
+    .deleteMany({ _id: { $in: participantsToRemove.map((p) => p._id) } });
+}, 15000);
 
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
