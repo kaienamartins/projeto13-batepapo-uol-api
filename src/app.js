@@ -149,7 +149,7 @@ app.post("/status", async (req, res) => {
   }
 });
 
-setInterval(async () => {
+async function checkInactiveParticipants() {
   const participants = await db.collection("participants").find().toArray();
   const tenSecondsAgo = Date.now() - 10000;
   const participantsToRemove = participants.filter(
@@ -166,6 +166,10 @@ setInterval(async () => {
   await db
     .collection("participants")
     .deleteMany({ _id: { $in: participantsToRemove.map((p) => p._id) } });
+}
+
+setInterval(async () => {
+  await checkInactiveParticipants();
 }, 15000);
 
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
