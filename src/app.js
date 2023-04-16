@@ -75,7 +75,7 @@ app.post("/messages", async (req, res) => {
   const messageSchema = joi.object({
     to: joi.string().required(),
     text: joi.string().required(),
-    type: joi.string().required(),
+    type: joi.string().valid("message", "status").required(),
   });
 
   const validation = messageSchema.validate(req.body, { abortEarly: false });
