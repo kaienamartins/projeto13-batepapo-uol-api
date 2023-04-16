@@ -106,7 +106,11 @@ app.post("/messages", async (req, res) => {
 
 app.get("/messages", async (req, res) => {
   const user = req.headers.user;
-  const limit = req.query.limit;
+  const limit = Number(req.query.limit);
+
+  if (!Number.isInteger(limit) || limit < 1) {
+    return res.status(422).send();
+  }
 
   try {
     const messages = await db
@@ -115,7 +119,7 @@ app.get("/messages", async (req, res) => {
       .sort({ _id: -1 })
       .limit(Number(limit))
       .toArray();
-    res.send(messages);
+    if (limit) res.send(messages);
   } catch (err) {
     res.status(500).send(err.message);
   }
