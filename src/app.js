@@ -91,7 +91,7 @@ app.post("/messages", async (req, res) => {
       .findOne({ name: from });
 
     if (!participant) {
-      res.status(422).send("Usuário não cadastrado");
+      return res.status(422).send("Usuário não cadastrado");
     }
 
     await db
