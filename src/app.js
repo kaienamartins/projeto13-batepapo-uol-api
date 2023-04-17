@@ -134,23 +134,24 @@ app.get("/messages", async (req, res) => {
 });
 
 app.post("/status", async (req, res) => {
-  const name = req.headers.user;
-  if (!name) {
-    return res.status(404).send();
-  }
+  const user = req.headers.user;
+  const lastStatus = Date.now();
 
   try {
-    const participant = await db.collection("participants").findOne({ name });
-    if (!participant) {
-      return res.status(404).send();
-    }
+    const participant = await db
+      .collection("participants")
+      .findOne({ name: user });
 
-    const lastStatus = Date.now();
-    await db.collection("participants").updateOne({ name }, { $set: { lastStatus } });
+    if (!user) return res.status(404).send();
+    if (!participant) return res.status(404).send();
 
-    return res.status(200).send();
+    await db
+      .collection("participants")
+      .updateOne({ name: user }, { $set: { lastStatus } });
+
+    res.status(200).send();
   } catch (err) {
-    return res.status(500).send(err.message);
+    res.status(500).send(err.message);
   }
 });
 
@@ -175,6 +176,5 @@ setInterval(async () => {
     }
   }
 }, 15000);
-
 
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
