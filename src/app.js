@@ -160,4 +160,27 @@ app.post("/status", async (req, res) => {
   }
 });
 
+
+setInterval(async () => {
+  const tenSeconds = Date.now() - 10000;
+  const participantsToRemove = await db.collection("participants").find({ lastStatus: { $lt: tenSeconds } }).toArray();
+  const namesToRemove = participantsToRemove.map(p => p.name);
+
+  if (namesToRemove.length > 0) {
+    await db.collection("participants").deleteMany({ name: { $in: namesToRemove } });
+
+    for (const name of namesToRemove) {
+      const message = {
+        from: name,
+        to: "Todos",
+        text: "sai da sala...",
+        type: "status",
+        time: dayjs().format("HH:mm:ss")
+      };
+
+      await db.collection("messages").insertOne(message);
+    }
+  }
+}, 15000);
+
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
