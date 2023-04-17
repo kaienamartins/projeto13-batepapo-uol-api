@@ -109,28 +109,36 @@ app.post("/messages", async (req, res) => {
   }
 });
 
-app.get("/messages", async (req, res) => {
-  const limit = Number(req.query.limit);
-  const { user } = req.headers;
-  try {
-    const messages = await db
-      .collection("messages")
-      .find({
-        $or: [
-          { from: user },
-          { to: { $in: [user, "Todos"] } },
-          { type: "message" },
-        ],
-      })
-      .toArray();
-    if (limit <= 0 || (isNaN(limit) && req.query.limit !== undefined)) {
-      res.status(422).send();
-      return;
-    }
-    res.status(200).send(messages.slice(-limit).reverse());
-  } catch (err) {
-    res.sendStatus(500);
+app.get("/messages", (req, res) => {
+  const limit = req.query.limit;
+  const user = req.headers.user;
+
+  const message = {
+    $or: [{ to: user }, { from: user }, { to: "Todos" }, { type: "message" }],
+  };
+
+  const lastMessages = {
+    sort: { _id: -1 },
+  };
+
+  if (limit && (isNaN(limit) || limit <= 0)) {
+    return res.sendStatus(422);
   }
+
+  db.collection("messages")
+    .find(message, lastMessages)
+    .toArray()
+    .then((messages) => {
+      if (messages && messages.length > 0) {
+        if (limit) {
+          messages = messages.slice(0, parseInt(limit));
+        }
+        res.send(messages);
+      } else {
+        res.sendStatus(404);
+      }
+    })
+    .catch((err) => res.sendStatus(500));
 });
 
 app.post("/status", async (req, res) => {
