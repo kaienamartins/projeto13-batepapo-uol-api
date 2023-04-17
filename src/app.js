@@ -61,7 +61,7 @@ app.post("/participants", async (req, res) => {
 
 app.get("/participants", async (req, res) => {
   try {
-    const participants = await db.collection("participants").find([]).toArray();
+    const participants = await db.collection("participants").find().toArray();
     res.send(participants);
   } catch (err) {
     res.status(500).send(err.message);
@@ -149,29 +149,24 @@ app.post("/status", async (req, res) => {
 });
 
 setInterval(async () => {
-  const timeFormat = dayjs().format("HH:mm:ss");
   const tenSeconds = Date.now() - 10000;
-  try {
-    const namesToRemove = db
-      .collection("participants")
-      .find({ lastStatus: { $lt: tenSeconds } })
-      .toArray();
+  const participantsToRemove = await db.collection("participants").find({ lastStatus: { $lt: tenSeconds } }).toArray();
+  const namesToRemove = participantsToRemove.map(p => p.name);
 
-    if (namesToRemove.length > 0) {
-      namesToRemove.map(async (name) => {
-        const exitMessage = {
-          from: name,
-          to: "Todos",
-          text: "sai da sala...",
-          type: "status",
-          time: timeFormat,
-        };
-        await db.collection("participants").deleteOne({ name });
-        await db.collection("messages").insertOne(exitMessage);
-      });
+  if (namesToRemove.length > 0) {
+    await db.collection("participants").deleteMany({ name: { $in: namesToRemove } });
+
+    for (const name of namesToRemove) {
+      const message = {
+        from: name,
+        to: "Todos",
+        text: "sai da sala...",
+        type: "status",
+        time: dayjs().format("HH:mm:ss")
+      };
+
+      await db.collection("messages").insertOne(message);
     }
-  } catch (error) {
-    res.sendStatus(500);
   }
 }, 15000);
 
