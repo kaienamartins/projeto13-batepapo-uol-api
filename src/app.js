@@ -72,11 +72,13 @@ app.post("/messages", async (req, res) => {
   const { to, text, type } = req.body;
   const from = req.headers.user;
 
-  const recipient = participants.find(p => p.name === to);
+  const recipient = await db.collection("participants").findOne({ name: to });
   if (!recipient) {
-    res.status(422).send("Destinatário não encontrado");
-    return;
+    return res.status(422).send("Destinatário não encontrado");
   }
+
+  if (!req.headers.has("user"))
+    return res.status(422).send("Cabeçalho 'User' não presente");
 
   const messageSchema = joi.object({
     to: joi.string().required(),
@@ -87,7 +89,10 @@ app.post("/messages", async (req, res) => {
   const validation = messageSchema.validate(req.body, { abortEarly: false });
 
   if (validation.error) {
-    const errors = validation.error.details.map((detail) => detail.message);
+    const errors = validation.error.details.map((detail) => {
+      const { message, context } = detail;
+      return `${context.label} ${message}`;
+    });
     return res.status(422).send(errors);
   }
 
@@ -154,27 +159,5 @@ app.post("/status", async (req, res) => {
     res.status(500).send(err.message);
   }
 });
-
-setInterval(async () => {
-  const tenSeconds = Date.now() - 10000;
-  const participantsToRemove = await db.collection("participants").find({ lastStatus: { $lt: tenSeconds } }).toArray();
-  const namesToRemove = participantsToRemove.map(p => p.name);
-
-  if (namesToRemove.length > 0) {
-    await db.collection("participants").deleteMany({ name: { $in: namesToRemove } });
-
-    for (const name of namesToRemove) {
-      const message = {
-        from: name,
-        to: "Todos",
-        text: "sai da sala...",
-        type: "status",
-        time: dayjs().format("HH:mm:ss")
-      };
-
-      await db.collection("messages").insertOne(message);
-    }
-  }
-}, 15000);
 
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
