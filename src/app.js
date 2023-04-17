@@ -72,6 +72,12 @@ app.post("/messages", async (req, res) => {
   const { to, text, type } = req.body;
   const from = req.headers.user;
 
+  const recipient = participants.find(p => p.name === to);
+  if (!recipient) {
+    res.status(422).send("Destinatário não encontrado");
+    return;
+  }
+
   const messageSchema = joi.object({
     to: joi.string().required(),
     text: joi.string().required(),
@@ -128,57 +134,47 @@ app.get("/messages", async (req, res) => {
 });
 
 app.post("/status", async (req, res) => {
-  const user = req.headers.user;
-  const lastStatus = Date.now();
+  const name = req.headers.user;
+  if (!name) {
+    return res.status(404).send();
+  }
 
   try {
-    const participant = await db
-      .collection("participants")
-      .findOne({ name: user });
+    const participant = await db.collection("participants").findOne({ name });
+    if (!participant) {
+      return res.status(404).send();
+    }
 
-    if (!user) return res.status(404).send();
-    if (!participant) return res.status(404).send();
+    const lastStatus = Date.now();
+    await db.collection("participants").updateOne({ name }, { $set: { lastStatus } });
 
-    await db
-      .collection("participants")
-      .updateOne({ name: user }, { $set: { lastStatus } });
-
-    res.status(200).send();
+    return res.status(200).send();
   } catch (err) {
-    res.status(500).send(err.message);
+    return res.status(500).send(err.message);
   }
 });
 
-async function checkInactiveParticipants() {
-  const participants = await db.collection("participants").find().toArray();
-  const tenSecondsAgo = Date.now() - 10000;
-  const participantsToRemove = participants.filter(
-    (participant) => participant.lastStatus < tenSecondsAgo
-  );
-  const messages = participantsToRemove.map((participant) => ({
-    from: participant.name,
-    to: "Todos",
-    text: "sai da sala...",
-    type: "status",
-    time: dayjs().format("HH:mm:ss"),
-  }));
-  await db.collection("messages").insertMany(messages);
-  for (const participant of participantsToRemove) {
-    const message = {
-      from: participant.name,
-      to: "Todos",
-      text: "sai da sala...",
-      type: "status",
-      time: dayjs().format("HH:mm:ss"),
-    };
-    await db.collection("messages").insertOne(message);
-    await db.collection("participants").deleteOne({ _id: ObjectId(participant._id) });
-  }
-}
-
-
 setInterval(async () => {
-  await checkInactiveParticipants();
+  const tenSeconds = Date.now() - 10000;
+  const participantsToRemove = await db.collection("participants").find({ lastStatus: { $lt: tenSeconds } }).toArray();
+  const namesToRemove = participantsToRemove.map(p => p.name);
+
+  if (namesToRemove.length > 0) {
+    await db.collection("participants").deleteMany({ name: { $in: namesToRemove } });
+
+    for (const name of namesToRemove) {
+      const message = {
+        from: name,
+        to: "Todos",
+        text: "sai da sala...",
+        type: "status",
+        time: dayjs().format("HH:mm:ss")
+      };
+
+      await db.collection("messages").insertOne(message);
+    }
+  }
 }, 15000);
+
 
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
