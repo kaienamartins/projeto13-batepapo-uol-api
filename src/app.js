@@ -82,9 +82,14 @@ app.post("/messages", async (req, res) => {
       return;
     }
 
-    const messageSchema = joi.object({ to: joi.string().required(),
-      text: joi.string().required(),
-      type: joi.valid('message', 'private_message').required() }, { abortEarly: false });
+    const messageSchema = joi.object(
+      {
+        to: joi.string().required(),
+        text: joi.string().required(),
+        type: joi.valid("message", "private_message").required(),
+      },
+      { abortEarly: false }
+    );
     if (messageSchema.error) {
       const errors = messageSchema.error.details.map((err) => err.message);
       res.status(422).send(errors);
@@ -151,25 +156,29 @@ app.post("/status", async (req, res) => {
 });
 
 setInterval(async () => {
-  const tenSeconds = Date.now() - 10000;
-  const participantsToRemove = await db.collection("participants").find({ lastStatus: { $lt: tenSeconds } }).toArray();
-  const namesToRemove = participantsToRemove.map(p => p.name);
+  const timeNow = dayjs().format("HH:mm:ss");
+  const dateNow = Date.now();
 
-  if (namesToRemove.length > 0) {
-    await db.collection("participants").deleteMany({ name: { $in: namesToRemove } });
+  db.collection("participants")
+    .find({ lastStatus: { $lt: dateNow - 10000 } })
+    .toArray()
+    .then((info) => {
+      info.forEach((user) => {
+        const { name, _id } = user;
 
-    for (const name of namesToRemove) {
-      const message = {
-        from: name,
-        to: "Todos",
-        text: "sai da sala...",
-        type: "status",
-        time: dayjs().format("HH:mm:ss")
-      };
-
-      await db.collection("messages").insertOne(message);
-    }
-  }
+        db.collection("participants")
+          .deleteOne({ _id: new ObjectId(_id.toString()) })
+          .then(
+            db.collection("messages").insertOne({
+              from: name,
+              to: "Todos",
+              text: "sai da sala...",
+              type: "status",
+              time: timeNow,
+            })
+          );
+      });
+    });
 }, 15000);
 
 app.listen(port, () => console.log(`Servidor rodando na porta ${port}`));
