@@ -70,76 +70,62 @@ app.get("/participants", async (req, res) => {
 
 app.post("/messages", async (req, res) => {
   const { to, text, type } = req.body;
-  const from = req.headers.user;
-
-  const recipient = await db.collection("participants").findOne({ name: to });
-  if (!recipient) {
-    return res.status(422).send("Destinatário não encontrado");
-  }
-
-  if (!from) {
-    return res.status(422).send("Cabeçalho 'User' não presente");
-  }
-
-  const messageSchema = joi.object({
-    to: joi.string().required(),
-    text: joi.string().required(),
-    type: joi.string().valid("message", "status").required(),
-  });
-
-  const validation = messageSchema.validate(req.body, { abortEarly: false });
-
-  if (validation.error) {
-    const errors = validation.error.details.map((detail) => {
-      const { message, context } = detail;
-      return `${context.label} ${message}`;
-    });
-    return res.status(422).send(errors);
-  }
-
+  const { user } = req.headers;
+  const time = dayjs().format("HH:mm:ss");
   try {
-    const participant = await db
+    const recipient = await db
       .collection("participants")
-      .findOne({ name: from });
+      .findOne({ name: user });
 
-    if (!participant) {
-      return res.status(422).send("Usuário não cadastrado");
+    if (!recipient) {
+      res.status(422).send("Destinatário não encontrado");
+      return;
     }
 
-    await db.collection("messages").insertOne({
-      from,
+    const messageSchema = messageJoi.validate(
+      { to, text, type },
+      { abortEarly: false }
+    );
+    if (messageSchema.error) {
+      const errors = messageSchema.error.details.map((err) => err.message);
+      res.status(422).send(errors);
+      return;
+    }
+
+    await messages.insertOne({
+      from: user,
       to,
       text,
       type,
-      time: dayjs().format("HH:mm:ss"),
+      time: time,
     });
-
-    return res.status(201).send();
+    res.status(201).send();
   } catch (err) {
     return res.status(500).send(err.message);
   }
 });
 
 app.get("/messages", async (req, res) => {
-  const user = req.headers.user;
   const limit = Number(req.query.limit);
-
-  if (!Number.isInteger(limit) || limit < 1) {
-    return res.status(422).send();
-  }
-
+  const { user } = req.headers;
   try {
     const messages = await db
       .collection("messages")
       .find({
-        $or: [{ to: "Todos" }, { to: user, type: "message" }, { from: user }],
+        $or: [
+          { from: user },
+          { to: { $in: [user, "Todos"] } },
+          { type: "message" },
+        ],
       })
-      .sort({ _id: -1 })
-      .limit(Number(limit))
       .toArray();
-    if (limit) res.send(messages);
+    if (limit <= 0 || (isNaN(limit) && req.query.limit !== undefined)) {
+      res.status(422).send();
+      return;
+    }
+    res.status(200).send(messages.slice(-limit).reverse());
   } catch (err) {
-    res.status(500).send(err.message);
+    res.sendStatus(500);
   }
 });
 
