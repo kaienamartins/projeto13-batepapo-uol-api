@@ -82,7 +82,9 @@ app.post("/messages", async (req, res) => {
       return;
     }
 
-    const messageSchema = joi.object({ to, text, type }, { abortEarly: false });
+    const messageSchema = joi.object({ to: joi.string().required(),
+      text: joi.string().required(),
+      type: joi.valid('message', 'private_message').required() }, { abortEarly: false });
     if (messageSchema.error) {
       const errors = messageSchema.error.details.map((err) => err.message);
       res.status(422).send(errors);
