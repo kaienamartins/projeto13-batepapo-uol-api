@@ -63,7 +63,6 @@ app.post("/participants", async (req, res) => {
   }
 });
 
-
 app.get("/participants", async (req, res) => {
   try {
     const participants = await db.collection("participants").find().toArray();
@@ -73,19 +72,11 @@ app.get("/participants", async (req, res) => {
   }
 });
 
-app.post("/messages", async (req, res) => {
-  const { to, text, type } = req.body;
-  const { user } = req.headers;
-  const time = dayjs().format("HH:mm:ss");
+app.post("/messages", (req, res) => {
   try {
-    const recipient = await db
-      .collection("participants")
-      .findOne({ name: user });
-
-    if (!recipient) {
-      res.status(422).send("Destinatário não encontrado");
-      return;
-    }
+    let { to, text, type } = req.body;
+    let user = req.headers.user;
+    const time = dayjs().format("HH:mm:ss");
 
     const messageSchema = joi.object(
       {
@@ -95,22 +86,31 @@ app.post("/messages", async (req, res) => {
       },
       { abortEarly: false }
     );
-    if (messageSchema.error) {
-      const errors = messageSchema.error.details.map((err) => err.message);
-      res.status(422).send(errors);
-      return;
-    }
 
-    await db.collection("messages").insertOne({
-      from: user,
-      to,
-      text,
-      type,
-      time: time,
-    });
-    res.status(201).send();
+    const validation = messageSchema.validate(req.body);
+    if (validation.error) return res.sendStatus(422);
+
+    db.collection("participants")
+      .findOne({ name: user })
+      .then((info) => {
+        if (info) {
+          db.collection("messages")
+            .insertOne({
+              from: user,
+              to: to,
+              text: text,
+              type: type,
+              time: time,
+            })
+            .then(() => res.sendStatus(201))
+            .catch((err) => res.send(err.message));
+        } else {
+          return res.sendStatus(422);
+        }
+      })
+      .catch(() => res.sendStatus(422));
   } catch (err) {
-    return res.status(500).send(err.message);
+    res.sendStatus(500);
   }
 });
 
@@ -148,7 +148,6 @@ app.get("/messages", (req, res) => {
     res.sendStatus(500);
   }
 });
-
 
 app.post("/status", async (req, res) => {
   const user = req.headers.user;
