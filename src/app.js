@@ -98,7 +98,9 @@ app.post("/messages", async (req, res) => {
   }
 
   try {
-    const participant = await db.collection("participants").findOne({ name: from });
+    const participant = await db
+      .collection("participants")
+      .findOne({ name: from });
 
     if (!participant) {
       return res.status(422).send("Usuário não cadastrado");
@@ -117,7 +119,6 @@ app.post("/messages", async (req, res) => {
     return res.status(500).send(err.message);
   }
 });
-
 
 app.get("/messages", async (req, res) => {
   const user = req.headers.user;
@@ -164,14 +165,18 @@ app.post("/status", async (req, res) => {
   }
 });
 
-
 setInterval(async () => {
   const tenSeconds = Date.now() - 10000;
-  const participantsToRemove = await db.collection("participants").find({ lastStatus: { $lt: tenSeconds } }).toArray();
-  const namesToRemove = participantsToRemove.map(p => p.name);
+  const participantsToRemove = await db
+    .collection("participants")
+    .find({ lastStatus: { $lt: tenSeconds } })
+    .toArray();
+  const namesToRemove = participantsToRemove.map((p) => p.name);
 
   if (namesToRemove.length > 0) {
-    await db.collection("participants").deleteMany({ name: { $in: namesToRemove } });
+    await db
+      .collection("participants")
+      .deleteMany({ name: { $in: namesToRemove } });
 
     for (const name of namesToRemove) {
       const message = {
@@ -179,7 +184,7 @@ setInterval(async () => {
         to: "Todos",
         text: "sai da sala...",
         type: "status",
-        time: dayjs().format("HH:mm:ss")
+        time: dayjs().format("HH:mm:ss"),
       };
 
       await db.collection("messages").insertOne(message);
