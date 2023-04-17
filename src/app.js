@@ -172,10 +172,8 @@ async function checkInactiveParticipants() {
       time: dayjs().format("HH:mm:ss"),
     };
     await db.collection("messages").insertOne(message);
+    await db.collection("participants").deleteOne({ _id: ObjectId(participant._id) });
   }
-  await db
-    .collection("participants")
-    .deleteMany({ _id: { $in: participantsToRemove.map((p) => p._id) } });
 }
 
 
