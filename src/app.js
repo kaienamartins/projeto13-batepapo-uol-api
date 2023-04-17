@@ -77,8 +77,9 @@ app.post("/messages", async (req, res) => {
     return res.status(422).send("Destinatário não encontrado");
   }
 
-  if (!req.headers.has("user"))
+  if (!from) {
     return res.status(422).send("Cabeçalho 'User' não presente");
+  }
 
   const messageSchema = joi.object({
     to: joi.string().required(),
@@ -97,23 +98,26 @@ app.post("/messages", async (req, res) => {
   }
 
   try {
-    const participant = await db
-      .collection("participants")
-      .findOne({ name: from });
+    const participant = await db.collection("participants").findOne({ name: from });
 
     if (!participant) {
       return res.status(422).send("Usuário não cadastrado");
     }
 
-    await db
-      .collection("messages")
-      .insertOne({ from, to, text, type, time: dayjs().format("HH:mm:ss") });
+    await db.collection("messages").insertOne({
+      from,
+      to,
+      text,
+      type,
+      time: dayjs().format("HH:mm:ss"),
+    });
 
     return res.status(201).send();
   } catch (err) {
     return res.status(500).send(err.message);
   }
 });
+
 
 app.get("/messages", async (req, res) => {
   const user = req.headers.user;
