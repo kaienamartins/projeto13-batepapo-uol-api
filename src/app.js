@@ -23,40 +23,43 @@ const db = mongoClient.db();
 
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
-  const lastStatus = Date.now();
   const time = dayjs().format("HH:mm:ss");
-  const participant = { name, lastStatus };
 
   const participantSchema = joi.object({
     name: joi.string().required(),
   });
 
-  const validation = participantSchema.validate(req.body, {
-    abortEarly: false,
-  });
+  const validation = participantSchema.validate(req.body);
 
-  if (validation.error) {
-    const errors = validation.error.details.map((detail) => detail.message);
-    return res.status(422).send(errors);
-  }
+  if (validation.error) return res.sendStatus(422);
 
-  try {
-    const userExists = await db.collection("participants").findOne({ name });
-    if (userExists) return res.status(409).send("Esse nome já foi cadastrado");
-
-    await db.collection("participants").insertOne(participant);
-    const message = {
-      from: name,
-      to: "Todos",
-      text: "entra na sala...",
-      type: "status",
-      time: time,
-    };
-    await db.collection("messages").insertOne(message);
-    res.status(201).send();
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
+  db.collection("participants")
+    .findOne({ name})
+    .then((info) => {
+      if (info) {
+        return res.sendStatus(409);
+      } else {
+        db.collection("participants")
+          .insertOne({
+            name: name,
+            lastStatus: Date.now(),
+          })
+          .then(() => {
+            db.collection("messages")
+              .insertOne({
+                from: name,
+                to: "Todos",
+                text: "entra na sala...",
+                type: "status",
+                time: time,
+              })
+              .then(() => res.sendStatus(201))
+              .catch((err) => res.send(err.message));
+          })
+          .catch((err) => res.send(err.message));
+      }
+    })
+    .catch((err) => res.send(err.message));
 });
 
 app.get("/participants", async (req, res) => {
