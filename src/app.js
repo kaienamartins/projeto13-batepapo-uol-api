@@ -29,38 +29,40 @@ app.post("/participants", async (req, res) => {
     name: joi.string().required(),
   });
 
-  const validation = participantSchema.validate(req.body);
+  try {
+    const validation = await participantSchema.validateAsync(req.body);
 
-  if (validation.error) return res.sendStatus(422);
+    if (validation.error) return res.sendStatus(422);
 
-  db.collection("participants")
-    .findOne({ name})
-    .then((info) => {
-      if (info) {
-        return res.sendStatus(409);
-      } else {
-        db.collection("participants")
-          .insertOne({
-            name: name,
-            lastStatus: Date.now(),
-          })
-          .then(() => {
-            db.collection("messages")
-              .insertOne({
-                from: name,
-                to: "Todos",
-                text: "entra na sala...",
-                type: "status",
-                time: time,
-              })
-              .then(() => res.sendStatus(201))
-              .catch((err) => res.send(err.message));
-          })
-          .catch((err) => res.send(err.message));
+    const info = await db.collection("participants").findOne({ name });
+
+    if (info) {
+      return res.sendStatus(409);
+    } else {
+      try {
+        await db.collection("participants").insertOne({
+          name: name,
+          lastStatus: Date.now(),
+        });
+
+        await db.collection("messages").insertOne({
+          from: name,
+          to: "Todos",
+          text: "entra na sala...",
+          type: "status",
+          time: time,
+        });
+
+        res.sendStatus(201);
+      } catch (error) {
+        res.send(error.message);
       }
-    })
-    .catch((err) => res.send(err.message));
+    }
+  } catch (error) {
+    res.sendStatus(422);
+  }
 });
+
 
 app.get("/participants", async (req, res) => {
   try {
