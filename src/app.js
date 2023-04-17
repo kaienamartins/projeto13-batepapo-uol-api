@@ -130,21 +130,25 @@ app.get("/messages", (req, res) => {
     return res.sendStatus(422);
   }
 
-  db.collection("messages")
-    .find(message, lastMessages)
-    .toArray()
-    .then((messages) => {
-      if (messages && messages.length > 0) {
-        if (limit) {
-          messages = messages.slice(0, parseInt(limit));
+  try {
+    db.collection("messages")
+      .find(message, lastMessages)
+      .toArray()
+      .then((messages) => {
+        if (messages && messages.length > 0) {
+          if (limit) {
+            messages = messages.slice(0, parseInt(limit));
+          }
+          res.send(messages);
+        } else {
+          res.sendStatus(404);
         }
-        res.send(messages);
-      } else {
-        res.sendStatus(404);
-      }
-    })
-    .catch((err) => res.sendStatus(500));
+      });
+  } catch (error) {
+    res.sendStatus(500);
+  }
 });
+
 
 app.post("/status", async (req, res) => {
   const user = req.headers.user;
